@@ -1,4 +1,5 @@
-import { ApolloClient, InMemoryCache, HttpLink, ApolloLink } from '@apollo/client';
+import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
+import { setContext } from '@apollo/client/link/context';
 import { auth } from '../services/firebase';
 
 // Create HTTP link
@@ -7,15 +8,14 @@ const httpLink = new HttpLink({
 });
 
 // Auth middleware to add Firebase token to requests
-const authLink = new ApolloLink((operation, forward) => {
-  return auth.currentUser?.getIdToken().then((token) => {
-    operation.setContext({
-      headers: {
-        authorization: token ? `Bearer ${token}` : '',
-      },
-    });
-    return forward(operation);
-  }) || forward(operation);
+const authLink = setContext(async (_, { headers }) => {
+  const token = await auth.currentUser?.getIdToken();
+  return {
+    headers: {
+      ...headers,
+      authorization: token ? `Bearer ${token}` : '',
+    },
+  };
 });
 
 // Create Apollo Client

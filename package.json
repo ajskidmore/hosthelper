@@ -3,15 +3,11 @@
   "version": "1.0.0",
   "description": "Full-stack short-term rental property management platform",
   "private": true,
-  "workspaces": [
-    "frontend",
-    "firebase/functions"
-  ],
   "scripts": {
-    "dev": "npm run dev --workspace=frontend",
-    "build": "npm run build --workspace=frontend",
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
     "deploy": "firebase deploy",
-    "setup": "npm install && npm install --workspace=frontend && npm install --workspace=firebase/functions"
+    "setup": "cd frontend && npm install && cd ../firebase/functions && npm install"
   },
   "keywords": [
     "rental",
@@ -21,5 +17,6 @@
     "graphql"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
