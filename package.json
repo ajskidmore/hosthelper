@@ -1,0 +1,25 @@
+{
+  "name": "hosthelper",
+  "version": "1.0.0",
+  "description": "Full-stack short-term rental property management platform",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "firebase/functions"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspace=frontend",
+    "deploy": "firebase deploy",
+    "setup": "npm install && npm install --workspace=frontend && npm install --workspace=firebase/functions"
+  },
+  "keywords": [
+    "rental",
+    "property-management",
+    "react",
+    "firebase",
+    "graphql"
+  ],
+  "author": "",
+  "license": "MIT"
+}
