@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -18,10 +18,20 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize services
 export const auth = getAuth(app);
+
+// Set persistence to LOCAL to ensure redirect state is preserved
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Error setting auth persistence:', error);
+});
+
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
 // Auth providers
 export const googleProvider = new GoogleAuthProvider();
+// Force account selection every time for testing
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 export default app;

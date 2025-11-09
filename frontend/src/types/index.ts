@@ -104,6 +104,7 @@ export interface ConnectedPlatform {
 export interface Booking {
   id: string;
   propertyId: string;
+  ownerId: string; // Property owner ID for easier querying and security
   guestName: string;
   guestEmail: string;
   guestPhone?: string;
@@ -138,11 +139,13 @@ export interface Task {
   taskType: TaskType;
   status: TaskStatus;
   priority: TaskPriority;
+  isPublic: boolean; // true = job for providers, false = private note for owner
   assignedTo?: string; // Service Provider ID
   createdBy: string; // Property Owner ID
   scheduledFor: Date;
-  estimatedDuration: number; // in minutes
-  payRate: number;
+  estimatedDuration?: number; // in minutes (for public jobs)
+  payRate?: number; // for public jobs
+  location?: string; // Address or location details
   completedAt?: Date;
   photos?: TaskPhoto[];
   notes?: string;

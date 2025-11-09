@@ -41,7 +41,8 @@ const ProtectedRoute = ({
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && user.role !== requiredRole) {
+  // Allow access if user has the role in their roles array (even if not currently active)
+  if (requiredRole && !user.roles.includes(requiredRole)) {
     return <Navigate to="/" replace />;
   }
 
@@ -66,11 +67,11 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
-        {/* Redirect to appropriate dashboard based on role */}
+        {/* Redirect to appropriate dashboard based on current role */}
         <Route
           index
           element={
-            user?.role === 'owner' ? (
+            user?.currentRole === 'owner' ? (
               <Navigate to="/owner/dashboard" replace />
             ) : (
               <Navigate to="/provider/dashboard" replace />

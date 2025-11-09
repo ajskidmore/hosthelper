@@ -59,8 +59,9 @@ const Register = () => {
     setLoading(true);
 
     try {
-      await signInWithGoogle();
-      navigate('/');
+      // Pass the selected role to Google sign-in
+      await signInWithGoogle(role);
+      // Navigation will happen automatically via App.tsx route protection
     } catch (err: any) {
       setError(err.message || 'Failed to sign in with Google');
     } finally {
@@ -107,31 +108,51 @@ const Register = () => {
             </Alert>
           )}
 
+          {/* Role Selection - Always visible at top */}
+          <FormControl component="fieldset" fullWidth sx={{ mb: 3 }}>
+            <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
+              I am a...
+            </FormLabel>
+            <ToggleButtonGroup
+              value={role}
+              exclusive
+              onChange={(_, value) => value && setRole(value)}
+              fullWidth
+              color="primary"
+            >
+              <ToggleButton value="owner">
+                <Business sx={{ mr: 1 }} />
+                Property Owner
+              </ToggleButton>
+              <ToggleButton value="provider">
+                <Work sx={{ mr: 1 }} />
+                Service Provider
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </FormControl>
+
+          {/* Google Sign In - Above the form */}
+          <Button
+            fullWidth
+            variant="contained"
+            size="large"
+            startIcon={<GoogleIcon />}
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            sx={{ mb: 2 }}
+          >
+            Continue with Google
+          </Button>
+
+          {/* Divider */}
+          <Divider sx={{ my: 3 }}>
+            <Typography variant="body2" color="text.secondary">
+              OR
+            </Typography>
+          </Divider>
+
           {/* Sign Up Form */}
           <form onSubmit={handleSubmit}>
-            {/* Role Selection */}
-            <FormControl component="fieldset" fullWidth sx={{ mb: 3 }}>
-              <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
-                I am a...
-              </FormLabel>
-              <ToggleButtonGroup
-                value={role}
-                exclusive
-                onChange={(_, value) => value && setRole(value)}
-                fullWidth
-                color="primary"
-              >
-                <ToggleButton value="owner">
-                  <Business sx={{ mr: 1 }} />
-                  Property Owner
-                </ToggleButton>
-                <ToggleButton value="provider">
-                  <Work sx={{ mr: 1 }} />
-                  Service Provider
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </FormControl>
-
             <TextField
               fullWidth
               label="Full Name"
@@ -176,34 +197,14 @@ const Register = () => {
             <Button
               type="submit"
               fullWidth
-              variant="contained"
+              variant="outlined"
               size="large"
               disabled={loading}
               sx={{ mt: 3, mb: 2 }}
             >
-              {loading ? 'Creating account...' : 'Create Account'}
+              {loading ? 'Creating account...' : 'Create Account with Email'}
             </Button>
           </form>
-
-          {/* Divider */}
-          <Divider sx={{ my: 3 }}>
-            <Typography variant="body2" color="text.secondary">
-              OR
-            </Typography>
-          </Divider>
-
-          {/* Google Sign In */}
-          <Button
-            fullWidth
-            variant="outlined"
-            size="large"
-            startIcon={<GoogleIcon />}
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-            sx={{ mb: 2 }}
-          >
-            Continue with Google
-          </Button>
 
           {/* Sign In Link */}
           <Box sx={{ textAlign: 'center', mt: 3 }}>

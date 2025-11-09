@@ -32,11 +32,14 @@ import {
   Notifications,
   AccountCircle,
   Logout,
+  SwapHoriz,
+  Business,
+  PersonOutline,
 } from '@mui/icons-material';
 import { useAuth } from '../../hooks/useAuth';
 
 const MainLayout = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, switchRole, addRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -62,6 +65,26 @@ const MainLayout = () => {
     navigate('/login');
   };
 
+  const handleSwitchRole = async (newRole: 'owner' | 'provider') => {
+    if (!user) return;
+
+    try {
+      // If user doesn't have the role yet, add it
+      if (!user.roles.includes(newRole)) {
+        await addRole(newRole);
+      }
+
+      // Switch to the new role
+      await switchRole(newRole);
+
+      // Navigate to the appropriate dashboard
+      navigate(newRole === 'owner' ? '/owner/dashboard' : '/provider/dashboard');
+      handleProfileMenuClose();
+    } catch (error) {
+      console.error('Error switching role:', error);
+    }
+  };
+
   // Navigation items based on user role
   const ownerNavItems = [
     { text: 'Dashboard', icon: <Dashboard />, path: '/owner/dashboard' },
@@ -78,7 +101,7 @@ const MainLayout = () => {
     { text: 'Messages', icon: <Message />, path: '/messages' },
   ];
 
-  const navItems = user?.role === 'owner' ? ownerNavItems : providerNavItems;
+  const navItems = user?.currentRole === 'owner' ? ownerNavItems : providerNavItems;
 
   const drawer = (
     <Box>
@@ -97,7 +120,7 @@ const MainLayout = () => {
           HostHelper
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          {user?.role === 'owner' ? 'Property Owner' : 'Service Provider'}
+          {user?.currentRole === 'owner' ? 'Property Owner' : 'Service Provider'}
         </Typography>
       </Box>
 
@@ -195,6 +218,45 @@ const MainLayout = () => {
           </ListItemIcon>
           Profile
         </MenuItem>
+        <Divider />
+
+        {/* Role Switcher */}
+        <Box sx={{ px: 2, py: 1 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+            Switch Role
+          </Typography>
+        </Box>
+        <MenuItem
+          onClick={() => handleSwitchRole('owner')}
+          selected={user?.currentRole === 'owner'}
+          disabled={user?.currentRole === 'owner'}
+        >
+          <ListItemIcon>
+            <Business fontSize="small" />
+          </ListItemIcon>
+          Property Owner
+          {user?.currentRole === 'owner' && (
+            <Typography variant="caption" sx={{ ml: 'auto', color: 'primary.main' }}>
+              Current
+            </Typography>
+          )}
+        </MenuItem>
+        <MenuItem
+          onClick={() => handleSwitchRole('provider')}
+          selected={user?.currentRole === 'provider'}
+          disabled={user?.currentRole === 'provider'}
+        >
+          <ListItemIcon>
+            <PersonOutline fontSize="small" />
+          </ListItemIcon>
+          Service Provider
+          {user?.currentRole === 'provider' && (
+            <Typography variant="caption" sx={{ ml: 'auto', color: 'primary.main' }}>
+              Current
+            </Typography>
+          )}
+        </MenuItem>
+
         <Divider />
         <MenuItem onClick={handleSignOut}>
           <ListItemIcon>
