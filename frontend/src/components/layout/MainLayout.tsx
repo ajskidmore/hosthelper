@@ -37,9 +37,11 @@ import {
   PersonOutline,
 } from '@mui/icons-material';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotifications } from '../../hooks/useNotifications';
 
 const MainLayout = () => {
   const { user, signOut, switchRole, addRole } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -185,7 +187,7 @@ const MainLayout = () => {
 
           {/* Notifications */}
           <IconButton color="inherit" sx={{ mr: 1 }}>
-            <Badge badgeContent={3} color="error">
+            <Badge badgeContent={unreadCount} color="error">
               <Notifications />
             </Badge>
           </IconButton>

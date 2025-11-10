@@ -16,7 +16,6 @@ import { db } from '../services/firebase';
 
 // Generic Firestore hook for CRUD operations
 export function useFirestore<T extends DocumentData>(collectionName: string) {
-  const [documents] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,7 +101,6 @@ export function useFirestore<T extends DocumentData>(collectionName: string) {
   );
 
   return {
-    documents,
     loading,
     error,
     addDocument,

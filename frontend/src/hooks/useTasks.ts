@@ -16,17 +16,14 @@ export function useTasks(propertyId?: string) {
     if (propertyId) {
       constraints.push(where('propertyId', '==', propertyId));
     }
+    constraints.push(orderBy('scheduledFor', 'desc'));
   } else if (user?.currentRole === 'provider') {
-    // Providers see tasks assigned to them or available (posted) tasks
-    constraints.push(
-      or(
-        where('assignedTo', '==', user.id),
-        where('status', '==', 'posted')
-      )
-    );
+    // Providers see: tasks assigned to them (any status)
+    // Note: Once a job is accepted, assignedTo is set, so it will show up here
+    constraints.push(where('assignedTo', '==', user.id));
+    // Temporarily commented out orderBy until Firestore index is built
+    // constraints.push(orderBy('scheduledFor', 'desc'));
   }
-
-  constraints.push(orderBy('scheduledFor', 'desc'));
 
   const { documents: tasks, loading, error } = useFirestoreQuery<Task>(
     'tasks',

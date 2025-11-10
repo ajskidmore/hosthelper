@@ -27,7 +27,7 @@ import { useConversations, useMessages } from '../hooks/useMessages';
 import { useAuth } from '../hooks/useAuth';
 import { Conversation } from '../types';
 import { timestampToDate } from '../hooks/useFirestore';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
 const Messages = () => {
@@ -49,6 +49,29 @@ const Messages = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Mark messages as read when viewing a conversation
+  useEffect(() => {
+    if (!selectedConversation || !user) return;
+
+    const markMessagesAsRead = async () => {
+      try {
+        const unreadMessages = messages.filter(
+          (msg) => msg.recipientId === user.id && !msg.isRead
+        );
+
+        for (const msg of unreadMessages) {
+          await updateDoc(doc(db, 'messages', msg.id), { isRead: true });
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error marking messages as read:', error);
+        }
+      }
+    };
+
+    markMessagesAsRead();
+  }, [selectedConversation, messages, user]);
+
   useEffect(() => {
     // Load users based on role
     const loadUsers = async () => {
@@ -59,8 +82,8 @@ const Messages = () => {
 
         // Owners can message providers, providers can message owners
         const q = user.currentRole === 'owner'
-          ? query(usersRef, where('roles.provider', '==', true))
-          : query(usersRef, where('roles.owner', '==', true));
+          ? query(usersRef, where('roles', 'array-contains', 'provider'))
+          : query(usersRef, where('roles', 'array-contains', 'owner'));
 
         const snapshot = await getDocs(q);
         const users = snapshot.docs
@@ -68,7 +91,9 @@ const Messages = () => {
           .filter((u: any) => u.id !== user.id);
         setAvailableUsers(users);
       } catch (error) {
-        console.error('Error loading users:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error loading users:', error);
+        }
       }
     };
 
@@ -85,23 +110,29 @@ const Messages = () => {
     if (!otherParticipantId) return;
 
     try {
-      await sendMessage({
+      const messageData = {
         conversationId: selectedConversation.id,
         senderId: user.id,
         recipientId: otherParticipantId,
-        content: newMessage,
+        content: newMessage.trim(),
         isRead: false,
-        createdAt: new Date(),
-      } as any);
+      };
 
-      // Update conversation timestamp
+      const messageId = await sendMessage(messageData as any);
+
+      // Update conversation with last message and timestamp
       await updateConversation(selectedConversation.id, {
-        updatedAt: new Date(),
+        lastMessage: {
+          ...messageData,
+          id: messageId || '',
+          createdAt: Timestamp.now(),
+        },
       } as any);
 
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
     }
   };
 
@@ -140,7 +171,9 @@ const Messages = () => {
         }
       }, 500);
     } catch (error) {
-      console.error('Error creating conversation:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error creating conversation:', error);
+      }
     }
   };
 

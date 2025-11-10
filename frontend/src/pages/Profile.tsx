@@ -28,11 +28,14 @@ import {
   CheckCircle,
   Add,
   Star,
+  StarBorder,
 } from '@mui/icons-material';
 import { useAuth } from '../hooks/useAuth';
+import { useTasks } from '../hooks/useTasks';
 
 const Profile = () => {
   const { user, addRole, switchRole } = useAuth();
+  const { tasks } = useTasks();
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [error, setError] = useState('');
@@ -41,6 +44,17 @@ const Profile = () => {
 
   const hasOwnerRole = user?.roles.includes('owner');
   const hasProviderRole = user?.roles.includes('provider');
+
+  // Calculate average provider rating (ratings owners gave to this provider)
+  const providerRatings = tasks
+    .filter((task) => task.assignedTo === user?.id && task.providerRating)
+    .map((task) => task.providerRating!);
+
+  const averageProviderRating = providerRatings.length > 0
+    ? providerRatings.reduce((sum, rating) => sum + rating, 0) / providerRatings.length
+    : 0;
+
+  const totalRatings = providerRatings.length;
 
   const handleAddRole = async (role: 'owner' | 'provider') => {
     setError('');
@@ -182,6 +196,30 @@ const Profile = () => {
                       {user?.roles.length} role{user?.roles.length !== 1 ? 's' : ''}
                     </Typography>
                   </Grid>
+                  {hasProviderRole && totalRatings > 0 && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">
+                        Service Provider Rating
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body1" fontWeight={600}>
+                          {averageProviderRating.toFixed(1)}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          {[...Array(5)].map((_, i) => (
+                            i < Math.round(averageProviderRating) ? (
+                              <Star key={i} sx={{ fontSize: 18, color: 'warning.main' }} />
+                            ) : (
+                              <StarBorder key={i} sx={{ fontSize: 18, color: 'warning.main' }} />
+                            )
+                          ))}
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          ({totalRatings} review{totalRatings !== 1 ? 's' : ''})
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
                 </Grid>
               )}
             </CardContent>

@@ -14,6 +14,9 @@ import {
 } from '@mui/material';
 import { Booking, BookingSource, BookingStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { timestampToDate } from '../../hooks/useFirestore';
 
 interface BookingDialogProps {
   open: boolean;
@@ -21,6 +24,7 @@ interface BookingDialogProps {
   onSave: (bookingData: Partial<Booking>) => Promise<void>;
   booking?: Booking | null;
   propertyId: string;
+  initialDate?: Date | null;
 }
 
 const bookingSources: { value: BookingSource; label: string }[] = [
@@ -38,7 +42,7 @@ const bookingStatuses: { value: BookingStatus; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
-const BookingDialog = ({ open, onClose, onSave, booking, propertyId }: BookingDialogProps) => {
+const BookingDialog = ({ open, onClose, onSave, booking, propertyId, initialDate }: BookingDialogProps) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -70,11 +74,58 @@ const BookingDialog = ({ open, onClose, onSave, booking, propertyId }: BookingDi
         totalPrice: booking.totalPrice,
         specialRequests: booking.specialRequests || '',
       });
+    } else if (initialDate && open) {
+      // Pre-fill check-in date when creating new booking from calendar
+      const dateStr = initialDate.toISOString().split('T')[0];
+      setFormData(prev => ({
+        ...prev,
+        checkInDate: dateStr,
+      }));
     }
-  }, [booking]);
+  }, [booking, initialDate, open]);
 
   const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const checkForOverlappingBookings = async (checkIn: Date, checkOut: Date): Promise<boolean> => {
+    try {
+      const bookingsRef = collection(db, 'bookings');
+      const q = query(
+        bookingsRef,
+        where('propertyId', '==', propertyId),
+        where('status', 'in', ['pending', 'confirmed', 'checked_in'])
+      );
+
+      const snapshot = await getDocs(q);
+      const existingBookings = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Booking))
+        .filter(b => booking ? b.id !== booking.id : true); // Exclude current booking if editing
+
+      // Check for date overlaps
+      for (const existingBooking of existingBookings) {
+        const existingCheckIn = timestampToDate(existingBooking.checkInDate);
+        const existingCheckOut = timestampToDate(existingBooking.checkOutDate);
+
+        // Check if dates overlap
+        const hasOverlap = (
+          (checkIn >= existingCheckIn && checkIn < existingCheckOut) ||
+          (checkOut > existingCheckIn && checkOut <= existingCheckOut) ||
+          (checkIn <= existingCheckIn && checkOut >= existingCheckOut)
+        );
+
+        if (hasOverlap) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error checking for overlapping bookings:', err);
+      }
+      return false;
+    }
   };
 
   const handleSubmit = async () => {
@@ -87,6 +138,24 @@ const BookingDialog = ({ open, onClose, onSave, booking, propertyId }: BookingDi
     setError('');
 
     try {
+      const checkInDate = new Date(formData.checkInDate);
+      const checkOutDate = new Date(formData.checkOutDate);
+
+      // Validate dates
+      if (checkOutDate <= checkInDate) {
+        setError('Check-out date must be after check-in date');
+        setLoading(false);
+        return;
+      }
+
+      // Check for overlapping bookings
+      const hasOverlap = await checkForOverlappingBookings(checkInDate, checkOutDate);
+      if (hasOverlap) {
+        setError('These dates overlap with an existing booking for this property');
+        setLoading(false);
+        return;
+      }
+
       const bookingData: Partial<Booking> = {
         propertyId,
         ownerId: user.id,
@@ -94,8 +163,8 @@ const BookingDialog = ({ open, onClose, onSave, booking, propertyId }: BookingDi
         guestEmail: formData.guestEmail,
         guestPhone: formData.guestPhone || '',
         numberOfGuests: formData.numberOfGuests,
-        checkInDate: new Date(formData.checkInDate),
-        checkOutDate: new Date(formData.checkOutDate),
+        checkInDate: checkInDate,
+        checkOutDate: checkOutDate,
         bookingSource: formData.bookingSource,
         status: formData.status,
         totalPrice: formData.totalPrice,

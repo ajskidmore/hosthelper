@@ -48,11 +48,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Fetch user data from Firestore
   const fetchUserData = async (firebaseUser: FirebaseUser): Promise<User | null> => {
     try {
-      console.log('Fetching user data for:', firebaseUser.uid);
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        console.log('User document found:', userData);
 
         // Handle both old single role and new multiple roles format
         let roles: ('owner' | 'provider')[];
@@ -76,10 +74,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: userData.photoURL || firebaseUser.photoURL || undefined,
         };
       }
-      console.log('User document does not exist for:', firebaseUser.uid);
       return null;
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching user data:', error);
+      }
       return null;
     }
   };
@@ -132,22 +131,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Sign in with Google using popup
   const signInWithGoogle = async (role?: 'owner' | 'provider') => {
     try {
-      console.log('[GOOGLE AUTH] Starting popup sign-in...');
-      if (role) {
-        console.log('[GOOGLE AUTH] Role specified:', role);
-      }
-
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
-
-      console.log('[GOOGLE AUTH] Popup sign-in successful:', firebaseUser.email);
 
       // Check if user document exists
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
 
       if (!userDoc.exists()) {
-        console.log('[GOOGLE AUTH] Creating new user document...');
-
         // Use provided role or default to 'owner'
         const userRole = role || 'owner';
 
@@ -169,21 +159,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
 
         await setDoc(doc(db, 'users', firebaseUser.uid), userData);
-        console.log('[GOOGLE AUTH] User document created with role:', userRole);
 
         // Manually fetch and set the user data to avoid race condition
         const newUserData = await fetchUserData(firebaseUser);
         if (newUserData) {
-          console.log('[GOOGLE AUTH] Manually setting user data:', newUserData);
           setUser(newUserData);
           setLoading(false);
         }
       } else {
-        console.log('[GOOGLE AUTH] User document already exists');
         // Fetch and set existing user data
         const existingUserData = await fetchUserData(firebaseUser);
         if (existingUserData) {
-          console.log('[GOOGLE AUTH] Setting existing user data:', existingUserData);
           setUser(existingUserData);
           setLoading(false);
         }
@@ -191,13 +177,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       // Handle specific popup errors
       if (error.code === 'auth/popup-closed-by-user') {
-        console.log('[GOOGLE AUTH] Popup closed by user');
         throw new Error('Sign-in cancelled');
       } else if (error.code === 'auth/popup-blocked') {
-        console.error('[GOOGLE AUTH] Popup blocked by browser');
         throw new Error('Popup blocked. Please allow popups for this site.');
       } else {
-        console.error('[GOOGLE AUTH] Error signing in with Google:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error signing in with Google:', error);
+        }
         throw new Error(error.message);
       }
     }
@@ -225,8 +211,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log('[ROLE SWITCH] Switching to role:', role);
-
       // Update Firestore
       await setDoc(
         doc(db, 'users', user.id),
@@ -236,9 +220,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Update local state
       setUser({ ...user, currentRole: role });
-      console.log('[ROLE SWITCH] Role switched successfully');
     } catch (error: any) {
-      console.error('Error switching role:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error switching role:', error);
+      }
       throw new Error(error.message);
     }
   };
@@ -250,13 +235,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (user.roles.includes(role)) {
-      console.log('[ADD ROLE] User already has this role');
       return;
     }
 
     try {
-      console.log('[ADD ROLE] Adding role:', role);
-
       const newRoles = [...user.roles, role];
 
       // Update Firestore
@@ -268,29 +250,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Update local state
       setUser({ ...user, roles: newRoles });
-      console.log('[ADD ROLE] Role added successfully');
     } catch (error: any) {
-      console.error('Error adding role:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error adding role:', error);
+      }
       throw new Error(error.message);
     }
   };
 
   // Listen to auth state changes
   useEffect(() => {
-    console.log('[AUTH] Setting up auth state listener...');
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('[AUTH STATE] Changed:', firebaseUser?.email || 'No user');
-
       if (firebaseUser) {
         // User is authenticated - fetch their data
         const userData = await fetchUserData(firebaseUser);
 
         if (userData) {
-          console.log('[AUTH STATE] Setting user data:', userData);
           setUser(userData);
         } else {
-          console.log('[AUTH STATE] No user document found - this should have been created during sign-in');
           setUser(null);
         }
       } else {
@@ -302,7 +279,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => {
-      console.log('[AUTH] Cleaning up auth state listener');
       unsubscribe();
     };
   }, []);

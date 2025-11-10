@@ -26,14 +26,16 @@ import { useAvailableJobs, useTasks } from '../../hooks/useTasks';
 import { useAuth } from '../../hooks/useAuth';
 import { Task } from '../../types';
 import { timestampToDate } from '../../hooks/useFirestore';
+import RatingDialog from '../../components/tasks/RatingDialog';
 
 const ProviderJobs = () => {
   const { jobs, loading } = useAvailableJobs();
-  const { tasks: myJobs } = useTasks(); // Jobs assigned to provider
-  const { updateTask } = useTasks();
+  const { tasks: myJobs, updateTask } = useTasks(); // Jobs assigned to provider
   const { user } = useAuth();
   const [selectedJob, setSelectedJob] = useState<Task | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
+  const [jobToRate, setJobToRate] = useState<Task | null>(null);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
@@ -91,7 +93,9 @@ const ProviderJobs = () => {
 
   // Filter out jobs already assigned to this provider
   const availableJobs = jobs.filter((job) => job.assignedTo !== user?.id);
-  const assignedJobs = myJobs.filter((job) => job.isPublic && job.assignedTo === user?.id);
+  // myJobs already contains only jobs assigned to this provider (from useTasks hook)
+  // We only want public jobs (posted jobs, not private internal notes)
+  const assignedJobs = myJobs.filter((job) => job.isPublic);
 
   return (
     <Box>
@@ -118,13 +122,23 @@ const ProviderJobs = () => {
         </Fade>
       )}
 
-      {/* Assigned Jobs Section */}
-      {assignedJobs.length > 0 && (
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" fontWeight={600} gutterBottom>
-            My Assigned Jobs ({assignedJobs.length})
-          </Typography>
-          <Grid container spacing={3} sx={{ mb: 4 }}>
+      {/* Assigned Jobs Section - Always visible */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h6" fontWeight={600} gutterBottom>
+          My Assigned Jobs ({assignedJobs.length})
+        </Typography>
+
+        {assignedJobs.length === 0 && (
+          <Card sx={{ p: 4, textAlign: 'center', bgcolor: 'grey.50' }}>
+            <WorkIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+            <Typography variant="body1" color="text.secondary">
+              No assigned jobs yet. Accept a job below to get started!
+            </Typography>
+          </Card>
+        )}
+
+        {assignedJobs.length > 0 && (
+          <Grid container spacing={3}>
             {assignedJobs.map((job) => (
               <Grid item xs={12} md={6} lg={4} key={job.id}>
                 <Card
@@ -208,13 +222,9 @@ const ProviderJobs = () => {
                           size="small"
                           variant="contained"
                           color="success"
-                          onClick={async () => {
-                            try {
-                              await updateTask(job.id, { status: 'completed' });
-                              setSuccess('Job marked as completed!');
-                            } catch (err: any) {
-                              setError(err.message || 'Failed to update status');
-                            }
+                          onClick={() => {
+                            setJobToRate(job);
+                            setRatingDialogOpen(true);
                           }}
                         >
                           Complete Job
@@ -226,8 +236,8 @@ const ProviderJobs = () => {
               </Grid>
             ))}
           </Grid>
-        </Box>
-      )}
+        )}
+      </Box>
 
       {/* Available Jobs Section */}
       <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -423,6 +433,31 @@ const ProviderJobs = () => {
           )}
         </DialogActions>
       </Dialog>
+
+      {/* Rating Dialog */}
+      <RatingDialog
+        open={ratingDialogOpen}
+        onClose={() => {
+          setRatingDialogOpen(false);
+          setJobToRate(null);
+        }}
+        onSubmit={async (rating, feedback) => {
+          if (!jobToRate) return;
+
+          await updateTask(jobToRate.id, {
+            status: 'completed',
+            completedAt: new Date(),
+            ownerRating: rating,
+            ownerFeedback: feedback,
+          });
+
+          setSuccess('Job completed and rating submitted!');
+          setJobToRate(null);
+        }}
+        title="Complete Job & Rate Property Owner"
+        ratingLabel="Rate your experience with this property owner"
+        feedbackLabel="Feedback for property owner"
+      />
     </Box>
   );
 };

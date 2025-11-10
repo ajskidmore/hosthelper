@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -29,10 +29,12 @@ import {
   Edit,
   Delete,
   TaskAlt as TaskIcon,
+  Star,
 } from '@mui/icons-material';
 import { useTasks } from '../../hooks/useTasks';
 import { useProperties } from '../../hooks/useProperties';
 import TaskDialog from '../../components/tasks/TaskDialog';
+import RatingDialog from '../../components/tasks/RatingDialog';
 import { Task, TaskStatus } from '../../types';
 import { timestampToDate } from '../../hooks/useFirestore';
 
@@ -48,6 +50,31 @@ const OwnerTasks = () => {
   const [menuTask, setMenuTask] = useState<Task | null>(null);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
+  const [taskToRate, setTaskToRate] = useState<Task | null>(null);
+  const prevTasksRef = useRef<Task[]>([]);
+
+  // Detect when a task becomes completed and needs rating
+  useEffect(() => {
+    const prevTasks = prevTasksRef.current;
+
+    tasks.forEach((task) => {
+      const prevTask = prevTasks.find((t) => t.id === task.id);
+
+      // If task just became completed and doesn't have a provider rating yet
+      if (
+        task.status === 'completed' &&
+        prevTask?.status !== 'completed' &&
+        !task.providerRating &&
+        task.assignedTo // Only if it was assigned to someone
+      ) {
+        setTaskToRate(task);
+        setRatingDialogOpen(true);
+      }
+    });
+
+    prevTasksRef.current = tasks;
+  }, [tasks]);
 
   const handleOpenDialog = (task?: Task) => {
     setSelectedTask(task || null);
@@ -99,6 +126,14 @@ const OwnerTasks = () => {
       } catch (err: any) {
         setError(err.message || 'Failed to delete task');
       }
+    }
+    handleMenuClose();
+  };
+
+  const handleRateProvider = () => {
+    if (menuTask) {
+      setTaskToRate(menuTask);
+      setRatingDialogOpen(true);
     }
     handleMenuClose();
   };
@@ -352,6 +387,12 @@ const OwnerTasks = () => {
           <Edit sx={{ mr: 1, fontSize: 20 }} />
           Edit
         </MenuItemComp>
+        {menuTask?.status === 'completed' && menuTask?.assignedTo && (
+          <MenuItemComp onClick={handleRateProvider}>
+            <Star sx={{ mr: 1, fontSize: 20 }} />
+            {menuTask?.providerRating ? 'Update Rating' : 'Rate Provider'}
+          </MenuItemComp>
+        )}
         <MenuItemComp onClick={handleDelete} sx={{ color: 'error.main' }}>
           <Delete sx={{ mr: 1, fontSize: 20 }} />
           Delete
@@ -368,6 +409,29 @@ const OwnerTasks = () => {
           propertyId={selectedTask?.propertyId || defaultPropertyId}
         />
       )}
+
+      {/* Rating Dialog */}
+      <RatingDialog
+        open={ratingDialogOpen}
+        onClose={() => {
+          setRatingDialogOpen(false);
+          setTaskToRate(null);
+        }}
+        onSubmit={async (rating, feedback) => {
+          if (!taskToRate) return;
+
+          await updateTask(taskToRate.id, {
+            providerRating: rating,
+            providerFeedback: feedback,
+          });
+
+          setSuccess('Provider rating submitted successfully!');
+          setTaskToRate(null);
+        }}
+        title="Rate Service Provider"
+        ratingLabel="Rate the service provider's work quality"
+        feedbackLabel="Feedback for service provider"
+      />
     </Box>
   );
 };

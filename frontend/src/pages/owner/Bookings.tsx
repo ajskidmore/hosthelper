@@ -48,6 +48,7 @@ const OwnerBookings = () => {
   );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('calendar');
@@ -56,7 +57,6 @@ const OwnerBookings = () => {
   // Auto-select first property when properties load (run only once when properties first load)
   useEffect(() => {
     if (properties.length > 0 && selectedPropertyId === 'all') {
-      console.log('[BOOKINGS] Auto-selecting first property:', properties[0].id);
       setSelectedPropertyId(properties[0].id);
     }
   }, [properties.length]); // Only depend on length to avoid infinite loop
@@ -73,6 +73,7 @@ const OwnerBookings = () => {
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setSelectedBooking(null);
+    setSelectedDate(null);
   };
 
   const handleSaveBooking = async (bookingData: Partial<Booking>) => {
@@ -86,6 +87,9 @@ const OwnerBookings = () => {
       }
       handleCloseDialog();
     } catch (err: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error saving booking:', err);
+      }
       setError(err.message || 'Failed to save booking');
     }
   };
@@ -168,6 +172,7 @@ const OwnerBookings = () => {
     }
     // Open dialog with pre-filled check-in date
     setSelectedBooking(null);
+    setSelectedDate(date);
     setDialogOpen(true);
   };
 
@@ -451,16 +456,15 @@ const OwnerBookings = () => {
         </TableContainer>
       )}
 
-      {/* Booking Dialog */}
-      {selectedPropertyId !== 'all' && (
-        <BookingDialog
-          open={dialogOpen}
-          onClose={handleCloseDialog}
-          onSave={handleSaveBooking}
-          booking={selectedBooking}
-          propertyId={selectedPropertyId}
-        />
-      )}
+      {/* Booking Dialog - Always render but control via open prop */}
+      <BookingDialog
+        open={dialogOpen && selectedPropertyId !== 'all'}
+        onClose={handleCloseDialog}
+        onSave={handleSaveBooking}
+        booking={selectedBooking}
+        propertyId={selectedPropertyId !== 'all' ? selectedPropertyId : ''}
+        initialDate={selectedDate}
+      />
     </Box>
   );
 };

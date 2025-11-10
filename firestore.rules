@@ -11,16 +11,28 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    function getUserRoles() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles;
     }
 
-    function isPropertyOwner() {
-      return isAuthenticated() && getUserRole() == 'owner';
+    function getCurrentRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.currentRole;
     }
 
-    function isServiceProvider() {
-      return isAuthenticated() && getUserRole() == 'provider';
+    function hasOwnerRole() {
+      return isAuthenticated() && 'owner' in getUserRoles();
+    }
+
+    function hasProviderRole() {
+      return isAuthenticated() && 'provider' in getUserRoles();
+    }
+
+    function isCurrentlyOwner() {
+      return isAuthenticated() && getCurrentRole() == 'owner';
+    }
+
+    function isCurrentlyProvider() {
+      return isAuthenticated() && getCurrentRole() == 'provider';
     }
 
     // Users collection
@@ -34,30 +46,47 @@ service cloud.firestore {
     // Properties collection
     match /properties/{propertyId} {
       allow read: if isAuthenticated();
-      allow create: if isPropertyOwner();
-      allow update: if isPropertyOwner() &&
+      allow create: if isAuthenticated() && hasOwnerRole();
+      allow update: if isAuthenticated() && hasOwnerRole() &&
                        resource.data.ownerId == request.auth.uid;
-      allow delete: if isPropertyOwner() &&
+      allow delete: if isAuthenticated() && hasOwnerRole() &&
                        resource.data.ownerId == request.auth.uid;
     }
 
     // Bookings collection
     match /bookings/{bookingId} {
-      allow read: if isAuthenticated();
-      allow create: if isPropertyOwner();
-      allow update: if isPropertyOwner();
-      allow delete: if isPropertyOwner();
+      // Users can only read their own bookings
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      // Only owners can create bookings and must set ownerId to their own ID
+      allow create: if isAuthenticated() && hasOwnerRole() &&
+                       request.resource.data.ownerId == request.auth.uid;
+      // Only owners can update their own bookings
+      allow update: if isAuthenticated() && hasOwnerRole() &&
+                       resource.data.ownerId == request.auth.uid;
+      // Only owners can delete their own bookings
+      allow delete: if isAuthenticated() && hasOwnerRole() &&
+                       resource.data.ownerId == request.auth.uid;
     }
 
     // Tasks collection
     match /tasks/{taskId} {
-      allow read: if isAuthenticated();
-      allow create: if isPropertyOwner();
-      allow update: if isAuthenticated() && (
+      // Users can only read tasks they created, are assigned to, or public tasks if they're a provider
+      allow read: if isAuthenticated() && (
         resource.data.createdBy == request.auth.uid ||
-        resource.data.assignedTo == request.auth.uid
+        resource.data.assignedTo == request.auth.uid ||
+        (resource.data.isPublic == true && hasProviderRole())
       );
-      allow delete: if isPropertyOwner() &&
+      allow create: if isAuthenticated() && hasOwnerRole();
+      allow update: if isAuthenticated() && (
+        // Owner can update their own tasks
+        resource.data.createdBy == request.auth.uid ||
+        // Provider can update if already assigned
+        resource.data.assignedTo == request.auth.uid ||
+        // Provider can accept public jobs (assign themselves)
+        (hasProviderRole() && resource.data.isPublic == true &&
+         request.resource.data.assignedTo == request.auth.uid)
+      );
+      allow delete: if isAuthenticated() && hasOwnerRole() &&
                        resource.data.createdBy == request.auth.uid;
     }
 
@@ -68,9 +97,13 @@ service cloud.firestore {
         resource.data.recipientId == request.auth.uid
       );
       allow create: if isAuthenticated() &&
-                       request.resource.data.senderId == request.auth.uid;
+                       request.resource.data.senderId == request.auth.uid &&
+                       // Verify user is a participant in the conversation
+                       (request.resource.data.recipientId != null);
       allow update: if isAuthenticated() &&
                        resource.data.recipientId == request.auth.uid;
+      // Allow queries based on conversation participation
+      allow list: if isAuthenticated();
     }
 
     // Conversations collection

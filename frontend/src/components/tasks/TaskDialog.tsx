@@ -15,6 +15,7 @@ import {
   Switch,
 } from '@mui/material';
 import { Task, TaskType, TaskPriority, TaskStatus } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
 
 interface TaskDialogProps {
   open: boolean;
@@ -51,6 +52,7 @@ const statuses: { value: TaskStatus; label: string }[] = [
 ];
 
 const TaskDialog = ({ open, onClose, onSave, task, propertyId }: TaskDialogProps) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -106,12 +108,18 @@ const TaskDialog = ({ open, onClose, onSave, task, propertyId }: TaskDialogProps
   };
 
   const handleSubmit = async () => {
+    if (!user) {
+      setError('You must be logged in to create a task');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
       const taskData: Partial<Task> = {
         propertyId,
+        createdBy: user.id, // Required by security rules
         title: formData.title,
         description: formData.description,
         taskType: formData.taskType,
@@ -128,6 +136,9 @@ const TaskDialog = ({ open, onClose, onSave, task, propertyId }: TaskDialogProps
       await onSave(taskData);
       onClose();
     } catch (err: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error creating task:', err);
+      }
       setError(err.message || 'Failed to save task');
     } finally {
       setLoading(false);

@@ -5,20 +5,21 @@ export interface User {
   id: string;
   email: string;
   displayName: string;
-  role: UserRole;
+  roles: UserRole[];  // Changed to array to support multiple roles
+  currentRole: UserRole;  // Currently active role
   photoURL?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface PropertyOwner extends User {
-  role: 'owner';
+  currentRole: 'owner';
   properties: string[]; // Property IDs
   phoneNumber?: string;
 }
 
 export interface ServiceProvider extends User {
-  role: 'provider';
+  currentRole: 'provider';
   skills: string[];
   hourlyRate: number;
   serviceRadius: number; // in miles
@@ -149,6 +150,12 @@ export interface Task {
   completedAt?: Date;
   photos?: TaskPhoto[];
   notes?: string;
+  // Rating and feedback from owner about provider
+  providerRating?: number; // 1-5 stars
+  providerFeedback?: string;
+  // Rating and feedback from provider about owner
+  ownerRating?: number; // 1-5 stars
+  ownerFeedback?: string;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,11 +1,66 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { GlobalStyles } from '@mui/material';
 import { ApolloProvider } from '@apollo/client';
 import { theme } from './theme/theme';
 import { apolloClient } from './graphql/client';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './hooks/useAuth';
+
+// Global Styles for modern UX
+const globalStyles = (
+  <GlobalStyles
+    styles={{
+      '*': {
+        margin: 0,
+        padding: 0,
+        boxSizing: 'border-box',
+      },
+      'html': {
+        scrollBehavior: 'smooth',
+      },
+      'body': {
+        overflowX: 'hidden',
+      },
+      // Custom scrollbar
+      '::-webkit-scrollbar': {
+        width: '10px',
+        height: '10px',
+      },
+      '::-webkit-scrollbar-track': {
+        background: '#f1f1f1',
+      },
+      '::-webkit-scrollbar-thumb': {
+        background: '#888',
+        borderRadius: '5px',
+        '&:hover': {
+          background: '#555',
+        },
+      },
+      // Selection color
+      '::selection': {
+        backgroundColor: '#667eea',
+        color: '#ffffff',
+      },
+      '::-moz-selection': {
+        backgroundColor: '#667eea',
+        color: '#ffffff',
+      },
+      // Focus states
+      'a, button, input, textarea, select': {
+        '&:focus-visible': {
+          outline: '2px solid #667eea',
+          outlineOffset: '2px',
+        },
+      },
+      // Remove default button styles
+      'button': {
+        cursor: 'pointer',
+      },
+    }}
+  />
+);
 
 // Pages
 import Login from './pages/Login';
@@ -155,6 +210,7 @@ function App() {
     <ApolloProvider client={apolloClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
+        {globalStyles}
         <AuthProvider>
           <Router>
             <AppRoutes />

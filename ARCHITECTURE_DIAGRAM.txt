@@ -1,0 +1,282 @@
+================================================================================
+                    HOSTHELPER ARCHITECTURE DIAGRAM
+================================================================================
+
+FRONTEND LAYER:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        React Application (Vite)                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                      App.tsx (Router + Providers)                   │   │
+│  │  ┌──────────────────────────────────────────────────────────────┐  │   │
+│  │  │  ApolloProvider (UNUSED)  |  ThemeProvider  |  AuthProvider │  │   │
+│  │  └──────────────────────────────────────────────────────────────┘  │   │
+│  │                                                                      │   │
+│  │  Routes:                                                            │   │
+│  │  ├─ /login, /register              (Public)                       │   │
+│  │  ├─ /owner/* (Dashboard, Properties, Bookings, Tasks)             │   │
+│  │  ├─ /provider/* (Dashboard, Jobs, Earnings)                       │   │
+│  │  ├─ /messages, /profile             (Shared)                      │   │
+│  │  └─ ProtectedRoute (enforces auth + role)                         │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Pages Layer:                                                              │
+│  ├─ Login.tsx, Register.tsx                                               │
+│  ├─ Owner: Dashboard, Properties, Bookings, Tasks                         │
+│  ├─ Provider: Dashboard, Jobs, Earnings                                   │
+│  └─ Shared: Messages, Profile                                             │
+│                                                                             │
+│  Components:                                                               │
+│  ├─ MainLayout (sidebar navigation)                                       │
+│  ├─ PropertyDialog, BookingDialog, TaskDialog                             │
+│  └─ Material-UI components (Grid, Card, Table, etc)                       │
+│                                                                             │
+│  STATE MANAGEMENT:                                                         │
+│  ├─ AuthContext (provides user, signIn, signUp, signOut, etc)             │
+│  ├─ useAuth Hook (access auth context)                                    │
+│  ├─ Component useState (local UI state)                                   │
+│  └─ Firebase State (persistent user document)                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+CUSTOM HOOKS LAYER:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Data Access Hooks                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ useFirestore<T>(collectionName)       [GENERIC CRUD]              │   │
+│  │   ├─ addDocument(data)                                              │   │
+│  │   ├─ updateDocument(id, data)                                       │   │
+│  │   ├─ deleteDocument(id)                                             │   │
+│  │   └─ getDocument(id)                                                │   │
+│  │                                                                       │   │
+│  │ useFirestoreQuery<T>(collectionName, constraints) [REAL-TIME]      │   │
+│  │   └─ Subscribes via onSnapshot                                      │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Feature-Specific Hooks:                                                   │
+│  ├─ useProperties()          [where('ownerId' == user.id)]                │
+│  ├─ useBookings(propertyId)  [where('ownerId' == user.id), orderBy(...)]  │
+│  ├─ useTasks(propertyId)     [Role-based filtering]                       │
+│  ├─ useAvailableJobs()       [where('status' == 'posted')]                │
+│  ├─ useMessages(conversationId) [where('conversationId' == id)]           │
+│  ├─ useConversations()       [where('participants' array-contains user)]   │
+│  └─ useNotifications()       [where('userId' == user.id)]                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+FIREBASE SDK LAYER:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Firebase Services (Direct SDK)                          │
+│                                                                             │
+│  firebase/auth:                                                            │
+│  ├─ createUserWithEmailAndPassword()                                       │
+│  ├─ signInWithEmailAndPassword()                                           │
+│  ├─ signInWithPopup(googleProvider)                                        │
+│  ├─ signOut()                                                              │
+│  └─ onAuthStateChanged()                                                   │
+│                                                                             │
+│  firebase/firestore:                                                       │
+│  ├─ collection(db, 'users')                                                │
+│  ├─ query(collection, where(...), orderBy(...))                            │
+│  ├─ onSnapshot(query, callback)  [REAL-TIME LISTENER]                     │
+│  ├─ addDoc(), updateDoc(), deleteDoc(), getDoc()                           │
+│  └─ writeBatch()                                                           │
+│                                                                             │
+│  firebase/storage:                                                         │
+│  └─ getStorage(app)             [for property photos, task images]         │
+│                                                                             │
+│  Configuration:                                                            │
+│  └─ firebase.ts (Initialize Firebase with credentials from .env)          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+CLOUD FIRESTORE DATABASE:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Firestore Collections                              │
+│                                                                             │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐        │
+│  │    users/        │  │  properties/     │  │   bookings/      │        │
+│  │ {userId}         │  │ {propertyId}     │  │ {bookingId}      │        │
+│  │ ├─ email         │  │ ├─ ownerId       │  │ ├─ propertyId    │        │
+│  │ ├─ displayName   │  │ ├─ name          │  │ ├─ ownerId       │        │
+│  │ ├─ roles: []     │  │ ├─ address       │  │ ├─ guestName     │        │
+│  │ ├─ currentRole   │  │ ├─ bedrooms      │  │ ├─ checkInDate   │        │
+│  │ ├─ photoURL      │  │ ├─ photos: []    │  │ ├─ checkOutDate  │        │
+│  │ ├─ createdAt     │  │ ├─ status        │  │ ├─ totalPrice    │        │
+│  │ └─ [role fields] │  │ └─ createdAt     │  │ └─ status        │        │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘        │
+│                                                                             │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐        │
+│  │     tasks/       │  │  conversations/  │  │    messages/     │        │
+│  │   {taskId}       │  │ {conversationId} │  │   {messageId}    │        │
+│  │ ├─ propertyId    │  │ ├─ participants[]│  │ ├─ conversationId│        │
+│  │ ├─ createdBy     │  │ ├─ lastMessage   │  │ ├─ senderId      │        │
+│  │ ├─ assignedTo    │  │ ├─ updatedAt     │  │ ├─ content       │        │
+│  │ ├─ isPublic      │  │ └─ updatedAt     │  │ ├─ isRead        │        │
+│  │ ├─ status        │  └──────────────────┘  │ └─ createdAt     │        │
+│  │ ├─ priority      │                        └──────────────────┘        │
+│  │ ├─ payRate       │  ┌──────────────────┐                              │
+│  │ └─ createdAt     │  │ notifications/   │                              │
+│  └──────────────────┘  │  {notificationId}│                              │
+│                        │ ├─ userId        │                              │
+│                        │ ├─ type          │                              │
+│                        │ ├─ isRead        │                              │
+│                        │ └─ createdAt     │                              │
+│                        └──────────────────┘                              │
+│                                                                             │
+│  Security Rules: firestore.rules (enforces user isolation)                │
+│  Indexes: firestore.indexes.json                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↓
+FIREBASE BACKEND SERVICES:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Firebase Authentication (Email + Google OAuth)                            │
+│  ├─ User signup with email/password                                        │
+│  ├─ User login with email/password                                         │
+│  ├─ User login with Google (pop-up)                                        │
+│  └─ Persistent sessions (browserLocalPersistence)                          │
+│                                                                             │
+│  Cloud Firestore (Real-time NoSQL Database)                               │
+│  ├─ 7 main collections (users, properties, bookings, tasks, etc)           │
+│  ├─ Real-time listeners (onSnapshot)                                       │
+│  ├─ Security rules for access control                                      │
+│  └─ Automatic timestamps (createdAt, updatedAt)                            │
+│                                                                             │
+│  Cloud Functions (DEPLOYED BUT UNUSED)                                     │
+│  └─ /functions/src/index.ts (only boilerplate, no active functions)        │
+│                                                                             │
+│  Firebase Storage (for file uploads)                                       │
+│  └─ Stores property photos, task images, etc                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+UNUSED SERVICES (Installed but not integrated):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  GRAPHQL/APOLLO                                                            │
+│  ├─ ApolloClient configured in graphql/client.ts                           │
+│  ├─ NEVER USED - no queries, mutations, or gql imports in components       │
+│  ├─ No GraphQL endpoint serving data                                       │
+│  └─ Cost: ~300KB bundle size                                               │
+│                                                                             │
+│  PYTHON FASTAPI SERVICE                                                    │
+│  ├─ Location: /python-services/booking-processor/                          ���
+│  ├─ Endpoints: /sync/bookings, /mock/bookings/{platform}, etc             │
+│  ├─ NEVER CALLED from frontend                                             │
+│  └─ Would require separate deployment                                      │
+│                                                                             │
+│  ZUSTAND STATE MANAGEMENT                                                  │
+│  ├─ Installed as dependency                                                │
+│  ├─ NEVER IMPORTED in any file                                             │
+│  └─ React Context API used instead                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+DATA FLOW EXAMPLE: CREATE A PROPERTY
+================================================================================
+
+1. User clicks "Add Property" button
+   └─> PropertyDialog opens
+
+2. User fills form and clicks Save
+   └─> handleSaveProperty() called in Properties.tsx
+
+3. Component calls useProperties().addProperty(propertyData)
+   └─> Custom hook fires addDocument(data)
+
+4. addDocument() calls Firebase SDK
+   └─> await addDoc(collection(db, 'properties'), {...data, createdAt, updatedAt})
+
+5. Firebase writes to Firestore
+   └─> Database executes: INSERT INTO properties VALUES (...)
+
+6. Real-time listener (useFirestoreQuery) detects change
+   └─> onSnapshot callback fires automatically
+
+7. Component state updates
+   └─> setDocuments([...newData])
+
+8. UI re-renders with new property
+   └─> Component reads from properties state and displays it
+
+Entire flow: Form → Hook → Firebase SDK → Firestore → Listener → State → UI
+
+All happens in real-time without polling!
+
+================================================================================
+AUTHENTICATION FLOW
+================================================================================
+
+LOGIN:
+  User enters email/password
+    ↓
+  Login.tsx calls useAuth().signIn(email, password)
+    ↓
+  AuthContext calls signInWithEmailAndPassword(auth, email, password)
+    ↓
+  Firebase Auth verifies credentials
+    ↓
+  onAuthStateChanged listener triggers (in AuthContext useEffect)
+    ↓
+  fetchUserData() retrieves user document from Firestore
+    ↓
+  setUser(userData) updates Context state
+    ↓
+  Browser persists user (browserLocalPersistence)
+    ↓
+  App navigates to dashboard (ProtectedRoute allows access)
+
+LOGOUT:
+  User clicks logout
+    ↓
+  signOut() called
+    ↓
+  Firebase clears session
+    ↓
+  onAuthStateChanged listener triggers with null user
+    ↓
+  setUser(null) clears Context
+    ↓
+  App redirects to /login
+    ↓
+  New session requires login again
+
+GOOGLE OAUTH:
+  User clicks "Sign in with Google"
+    ↓
+  signInWithPopup(auth, googleProvider) opens popup
+    ↓
+  User selects/authenticates with Google account
+    ↓
+  Firebase receives OAuth token
+    ↓
+  Check if user document exists in Firestore
+    ├─ If NEW: Create user document with default roles
+    └─ If EXISTS: Load existing roles
+    ↓
+  setUser() with loaded/created data
+    ↓
+  App navigates to dashboard
+
+================================================================================
+ROLE SWITCHING FLOW
+================================================================================
+
+User has roles: ['owner', 'provider']
+Current role: 'owner'
+
+1. User clicks "Switch to Provider" button
+   └─> calls useAuth().switchRole('provider')
+
+2. switchRole() updates Firestore
+   └─> await setDoc(doc(db, 'users', user.id), {currentRole: 'provider'})
+
+3. Local state updates
+   └─> setUser({...user, currentRole: 'provider'})
+
+4. UI responds to changed currentRole
+   └─> Navigation shows provider pages instead of owner pages
+   └─> Data hooks show provider-specific data (available jobs instead of properties)
+   └─> Dashboard changes to show provider stats (earnings, active jobs)
+
+5. Data queries change based on role:
+   - Owner: See properties, bookings they own
+   - Provider: See posted public jobs, tasks assigned to them
+
+All done without page reload - smooth role switching!
+
+================================================================================
