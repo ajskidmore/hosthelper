@@ -1,4 +1,4 @@
-import { Grid, Paper, Typography, Box, Card, CardContent, Avatar, Button } from '@mui/material';
+import { Grid, Paper, Typography, Box, Card, CardContent, Avatar, Button, Alert } from '@mui/material';
 import {
   Home,
   CalendarMonth,
@@ -102,15 +102,17 @@ const OwnerDashboard = () => {
 
   // Calculate booking source distribution from real data
   const sourceCount = bookings.reduce((acc, b) => {
-    const source = b.source || 'Direct';
-    acc[source] = (acc[source] || 0) + 1;
+    const source = b.bookingSource || 'direct';
+    // Capitalize first letter for display
+    const displaySource = source.charAt(0).toUpperCase() + source.slice(1);
+    acc[displaySource] = (acc[displaySource] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
   const sourceColors: Record<string, string> = {
     'Airbnb': '#FF5A5F',
-    'Booking.com': '#003580',
-    'VRBO': '#0D2C58',
+    'Booking': '#003580',
+    'Vrbo': '#0D2C58',
     'Direct': '#10B981',
   };
 
@@ -177,7 +179,7 @@ const OwnerDashboard = () => {
       y: 0,
       opacity: 1,
       transition: {
-        type: "spring",
+        type: "spring" as const,
         stiffness: 100,
       },
     },
